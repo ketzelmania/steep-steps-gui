@@ -10,16 +10,23 @@ local Actions = {
 }
 
 pcall(function()
+    for i,v in pairs(getgenv().Conns) do
+        v:Disconnect()
+    end
+
     _G.FogConn:Disconnect()
     _G.PlayerAddedConn:Disconnect()
     _G.WalkVelocityConn:Disconnect()
     _G.ActionVariables.NoclipYLock:Destroy()
     _G.ActionVariables.NoclipConnection:Disconnect()
+    _G.HBEConn:Disconnect()
 
     for i in pairs(Actions) do
         CAS:UnbindAction(i)
     end
 end)
+
+getgenv().Conns = {}
 
 --\\ put "--[[" below and execute to disable everything
 --
@@ -41,6 +48,7 @@ local FlingTime = 0.6
 local LadderCollectTime = 0.5
 local RemovingFog = false
 
+local PushHBE = true
 
 --|| KEYCODES ||--
 
@@ -415,6 +423,10 @@ do
         RemovingFog = state
     end)
 
+    MiscSection:NewToggle("Push HBE", "Toggles push HBE.", function(state)
+        PushHBE = state
+    end)
+
     local OtherScripts = MiscTab:NewSection("Other Scripts")
 
     OtherScripts:NewButton("Unnamed ESP", "Opens Unnamed ESP.", function()
@@ -449,13 +461,48 @@ _G.FogConn = game:GetService("RunService").RenderStepped:Connect(function()
     Player.CameraMinZoomDistance = 0
 end)
 
-
 _G.ActionVariables = {
     NoclipToggled = false,
     NoclipConnection = nil,
     NoclipYLock = Instance.new("Part"),
     YLockPosition = 0,
 }
+
+getgenv().Conns.HBEConn = game:GetService("UserInputService").InputBegan:Connect(function(Input)
+    if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+    if not PushHBE then return end
+
+    if not Character:FindFirstChild("Push") then return end
+
+    local NearestPlayer
+    local NearestPlayerDistance = 20
+
+    for i,v in pairs(game.Players:GetPlayers()) do
+        if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local Distance = (Player.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+
+            if Distance < NearestPlayerDistance then
+                NearestPlayer = v
+                NearestPlayerDistance = Distance
+            end
+        end
+    end
+
+    if not NearestPlayer then return end
+
+    local OriginalPosition = Character.PrimaryPart.CFrame
+
+    do
+        local totalDT = 0
+        repeat
+            totalDT += task.wait()
+            Character:PivotTo((Character.PrimaryPart.CFrame + NearestPlayer.Character.HumanoidRootPart.CFrame.Position - Character.PrimaryPart.CFrame.Position + Vector3.new(0,2,0)) * CFrame.new(0,0,3))
+        until
+            totalDT > 1
+    end
+
+    Character:PivotTo(OriginalPosition)
+end)
 
 _G.ActionVariables.NoclipYLock = Instance.new("Part")
 _G.ActionVariables.NoclipYLock.Parent = nil
