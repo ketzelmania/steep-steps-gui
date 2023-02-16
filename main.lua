@@ -34,6 +34,8 @@ getgenv().Conns = {}
 --|| SETTINGS ||--
 
 local DashVelocity = 100
+
+local DefaultJump = false
 local JumpVelocity = 50
 local AdditiveJump = false
 
@@ -45,6 +47,7 @@ local FlingVelocity = 150
 local FlingRotationalVelocity = 50
 local FlingTime = 0.6
 
+local LadderCollectionPre = 0.2
 local LadderCollectTime = 0.5
 local RemovingFog = false
 
@@ -80,7 +83,12 @@ local BindFunctions = {
     Jump = function()
         local CV = Player.Character.Torso.AssemblyLinearVelocity
         
-        Player.Character.Torso.AssemblyLinearVelocity = Vector3.new(CV.X,JumpVelocity,CV.Z)
+        if AdditiveJump then
+            Player.Character.Torso.AssemblyLinearVelocity += Vector3.new(CV.X,JumpVelocity,CV.Z)
+        else
+            Player.Character.Torso.AssemblyLinearVelocity = Vector3.new(CV.X,JumpVelocity,CV.Z)
+        end
+
     end,
     Dash = function()
         local Torso = Character:FindFirstChild("Torso")
@@ -122,10 +130,10 @@ local BindFunctions = {
             Character:PivotTo(PlayerLadder.PrimaryPart.CFrame * CFrame.new(0,0,2))
             totalDT += task.wait()
         until
-            totalDT > 0.2
+            totalDT > LadderCollectionPre
 
         pcall(function()
-            workspace.live.Cogniscient.Ladder.Event:FireServer("Destroy", PlayerLadder)
+            workspace.live[Player.Name].Ladder.Event:FireServer("Destroy", PlayerLadder)
         end)
 
         totalDT = 0
@@ -294,6 +302,10 @@ do
         LadderCollectTime = s/1000
     end)
 
+    RetrieveSection:NewSlider("Get Ladder PreTime", "Changes time before TP.", 1000, 0, function(s)
+        LadderCollectionPre = s/1000
+    end)
+
     local FlingSection = LadderTab:NewSection("Fling Ladder")
 
     FlingSection:NewTextBox("Fling Ladder Bind", "Flings the ladder at your mouse.", function(txt)
@@ -334,6 +346,10 @@ do
 
     JumpSection:NewSlider("Jump Velocity", "Changes jump velocity.", 250, 0, function(s)
         JumpVelocity = s
+    end)
+
+    JumpSection:NewToggle("Default Jump", "Toggles default jumping.", function(state)
+        DefaultJump = state
     end)
 
     JumpSection:NewToggle("Additive Jump Velocity", "Toggles adding (+=) and setting (=) JumpVel.", function(state)
@@ -515,15 +531,26 @@ _G.ActionVariables.NoclipYLock.Material = Enum.Material.Cobblestone
 function AssignBinds(ActionType)
     if ActionType == Actions.All then
         for i,v in pairs(BindFunctions) do
-            CAS:BindAction(i, function(_, UIS)
+            CAS:BindAction(i, function(ActionName, UIS)
                 if UIS ~= Enum.UserInputState.Begin then return end
+
+                if ActionName == "Jump" and DefaultJump then
+                    Humanoid.Jump = true
+                end
+
                 v()
             end, false, ActionKeyCodes[i])
         end
     else
         CAS:BindAction(ActionType, function(_, UIS)
             if UIS ~= Enum.UserInputState.Begin then return end
+            
+            if ActionType == "Jump" and DefaultJump then
+                Humanoid.Jump = true
+            end
+
             BindFunctions[ActionType]()
+
         end, false, ActionKeyCodes[ActionType])
     end
 end
